@@ -4,13 +4,13 @@ import {
   requirementSchema,
   validateAndCleanCategoryDetails,
 } from '../validators/requirementValidator';
-import { getDBStatus } from '../config/database';
+import { getDBStatus, ensureDBConnected } from '../config/database';
 
 export async function submitRequirement(req: Request, res: Response): Promise<void> {
   try {
-    // Check database connectivity first
-    const dbStatus = getDBStatus();
-    if (!dbStatus.connected) {
+    // Ensure database connectivity
+    const isConnected = await ensureDBConnected();
+    if (!isConnected) {
       res.status(503).json({
         success: false,
         message: 'Database is currently unavailable. Please try again later.',
@@ -89,8 +89,11 @@ export async function submitRequirement(req: Request, res: Response): Promise<vo
   }
 }
 
-export function healthCheck(_req: Request, res: Response): void {
+export async function healthCheck(_req: Request, res: Response): Promise<void> {
+  // If disconnected, try a quick reconnect before reporting
+  await ensureDBConnected();
   const dbStatus = getDBStatus();
+
   res.status(200).json({
     success: true,
     message: 'GoPratle API is running.',

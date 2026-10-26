@@ -94,10 +94,12 @@ export default function Step4ReviewSubmit({
       } else {
         setSubmitError(result.message || 'Submission failed. Please try again.');
       }
-    } catch {
-      setSubmitError(
-        'Unable to connect to the server. Please check that the backend is running and try again.'
-      );
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Unable to connect to the server. Please check that the backend is running and try again.';
+      setSubmitError(message);
     } finally {
       setIsSubmitting(false);
     }

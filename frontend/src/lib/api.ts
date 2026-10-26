@@ -1,6 +1,8 @@
 import type { FormData, Category, APIResponse } from '@/types';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+const rawBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+// Normalize base URL: strip trailing slashes and redundant /api suffix
+export const API_BASE = rawBase.replace(/\/+$/, '').replace(/\/api$/, '');
 
 /**
  * Build the submission payload from flat form data,
@@ -70,14 +72,31 @@ function buildPayload(data: FormData) {
 export async function submitRequirement(data: FormData): Promise<APIResponse> {
   const payload = buildPayload(data);
 
-  const response = await fetch(`${API_BASE}/api/requirements`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}/api/requirements`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    throw new Error(
+      'Unable to reach the backend server. If the server is on a free tier, it may be waking up from sleep. Please try again in a few seconds.'
+    );
+  }
 
-  const result: APIResponse = await response.json();
-  return result;
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    const result: APIResponse = await response.json();
+    return result;
+  }
+
+  // Handle HTML or non-JSON responses (e.g. gateway timeout or proxy errors)
+  const text = await response.text();
+  return {
+    success: false,
+    message: `Server returned HTTP ${response.status}: ${text.slice(0, 120)}`,
+  };
 }
 
 /**
